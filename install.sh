@@ -5,7 +5,6 @@ SRC="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 install -Dm755 "$SRC/bin/cornertube" "$HOME/.local/bin/cornertube"
 install -Dm755 "$SRC/bin/cornertube-input" "$HOME/.local/bin/cornertube-input"
-install -Dm644 "$SRC/share/cornertube.desktop" "$HOME/.local/share/applications/cornertube.desktop"
 install -Dm644 "$SRC/share/cornertube-on-tv.desktop" "$HOME/.local/share/applications/cornertube-on-tv.desktop"
 # The desktop file name must match the GTK app id so the dock shows the icon.
 install -Dm644 "$SRC/share/com.jjuanent.cornertube-input.desktop" "$HOME/.local/share/applications/com.jjuanent.cornertube-input.desktop"

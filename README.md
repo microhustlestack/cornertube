@@ -53,7 +53,7 @@ Super+Alt+P next corner, Super+Alt+O cycle size.
 That installs, for the current user only (no sudo):
 
 - `~/.local/bin/cornertube` — the launcher script
-- `~/.local/share/applications/cornertube.desktop` — "CornerTube" in the Omarchy launcher
+- `cornertube app` — browse mode (YouTube TV in Brave), terminal-only: no launcher entry, so CornerTube has exactly one launcher icon
 - `~/.local/share/applications/cornertube-on-tv.desktop` — "TizenTube on TV" (see below)
 - A managed window-rule block appended to `~/.config/hypr/looknfeel.lua`
   (backup saved as `looknfeel.lua.bak.cornertube`), then reloads Hyprland
