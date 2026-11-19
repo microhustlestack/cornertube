@@ -1,6 +1,6 @@
 [Desktop Entry]
 Type=Application
-Name=Play a Video (PiP)
+Name=CornerTube
 Comment=Type a search or paste a link - plays video-only in the PiP corner
 Exec=cornertube-input
 Icon=cornertube

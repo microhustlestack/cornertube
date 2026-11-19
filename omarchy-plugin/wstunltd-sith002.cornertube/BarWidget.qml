@@ -15,7 +15,7 @@ BarWidget {
     id: button
     anchors.fill: parent
     bar: root.bar
-    tooltipText: "Play a Video (PiP)"
+    tooltipText: "CornerTube"
     iconComponent: Component {
       Image {
         source: Qt.resolvedUrl("icon.png")

@@ -1,6 +1,6 @@
 [Desktop Entry]
 Type=Application
-Name=CornerTube
+Name=CornerTube Browse
 Comment=YouTube TV in a pinned picture-in-picture window (Omarchy/Hyprland)
 Exec=cornertube app
 Icon=cornertube

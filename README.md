@@ -24,9 +24,9 @@ Two honest differences from the TV app:
   video directly with mpv + yt-dlp — no browser, no ads, just the video in
   the pinned PiP window.
 
-## The Play a Video chooser
+## The CornerTube chooser
 
-`Play a Video (PiP)` (script `cornertube-input`, a small GTK4 window) is
+`CornerTube` (script `cornertube-input`, a small GTK4 window) is
 the front door. Type a YouTube search and it shows the top 5 results
 **newest first**, each with a **thumbnail, title, channel, runtime and the
 date it was posted** - click one and it plays video-only in the PiP corner.

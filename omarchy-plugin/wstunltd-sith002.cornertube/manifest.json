@@ -10,7 +10,7 @@
   "entryPoints": { "barWidget": "BarWidget.qml" },
   "barWidget": {
     "displayName": "CornerTube",
-    "description": "Open the Play a Video (PiP) input box.",
+    "description": "Open the CornerTube input box.",
     "category": "Apps",
     "allowMultiple": false,
     "defaultSection": "right"
