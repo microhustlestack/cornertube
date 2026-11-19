@@ -99,28 +99,45 @@ hdispatch() {
   hyprctl dispatch "$lua" >/dev/null 2>&1 || hyprctl dispatch "$@" >/dev/null 2>&1 || true
 }
 
-monitor_size() {
+# Echo "logical_w logical_h pip_w pip_h margin" for the focused monitor.
+# Hyprland window coordinates are logical pixels: on a scaled monitor the
+# logical size is the physical size divided by the scale (e.g. Tiny One:
+# 3840x2160 @ 1.6 = 2400x1350). Using the physical size put the PiP window
+# completely off-screen there. The PiP size scales with the logical width
+# (1/4 of it, 16:9, margin 1/96), so it looks the same on every machine:
+# 960x540 + 40 margin at 3840 logical (Tiny Two), 600x338 + 25 at 2400.
+pip_metrics() {
   hyprctl monitors -j 2>/dev/null | python3 -c "
 import json, sys
 try:
     mons = json.load(sys.stdin)
 except Exception:
-    print('3840 2160'); sys.exit(0)
+    print('3840 2160 960 540 40'); sys.exit(0)
 m = next((m for m in mons if m.get('focused')), mons[0] if mons else {})
-print(m.get('width', 3840), m.get('height', 2160))
-" 2>/dev/null || echo "3840 2160"
+scale = m.get('scale') or 1
+lw = round(m.get('width', 3840) / scale)
+lh = round(m.get('height', 2160) / scale)
+pw = round(lw / 4)
+ph = round(pw * 9 / 16)
+margin = round(lw / 96)
+print(lw, lh, pw, ph, margin)
+" 2>/dev/null || echo "3840 2160 960 540 40"
+}
+
+monitor_size() {
+  pip_metrics | cut -d' ' -f1-2
 }
 
 # Float, pin, size and place the window at $1 (address) as a PiP overlay.
 apply_pip() {
-  local addr="$1" mw mh x y
-  read -r mw mh <<<"$(monitor_size)"
-  x=$(( mw - WIDTH - 40 ))
-  if [ "$POSITION" = "top-right" ]; then y=83; else y=$(( mh - HEIGHT - 40 )); fi
+  local addr="$1" mw mh pw ph margin x y
+  read -r mw mh pw ph margin <<<"$(pip_metrics)"
+  x=$(( mw - pw - margin ))
+  if [ "$POSITION" = "top-right" ]; then y=$(( 83 * margin / 40 )); else y=$(( mh - ph - margin )); fi
   # Each dispatcher is best-effort: window rules may already have done it.
   local w="address:$addr"
   hdispatch "hl.dsp.window.float({ window = \"$w\", action = \"on\" })" setfloating "$w"
-  hdispatch "hl.dsp.window.resize({ window = \"$w\", x = $WIDTH, y = $HEIGHT })" resizewindowpixel "exact $WIDTH $HEIGHT,$w"
+  hdispatch "hl.dsp.window.resize({ window = \"$w\", x = $pw, y = $ph })" resizewindowpixel "exact $pw $ph,$w"
   hdispatch "hl.dsp.window.move({ window = \"$w\", x = $x, y = $y })" movewindowpixel "exact $x $y,$w"
   # pin is a toggle without an action; action = "on" sets it idempotently.
   hdispatch "hl.dsp.window.pin({ window = \"$w\", action = \"on\" })" pin "$w"
@@ -128,7 +145,7 @@ apply_pip() {
   # Second pass: some apps (mpv especially) reposition themselves once the
   # stream/video size is known, after the first pass has already run.
   sleep 1
-  hdispatch "hl.dsp.window.resize({ window = \"$w\", x = $WIDTH, y = $HEIGHT })" resizewindowpixel "exact $WIDTH $HEIGHT,$w"
+  hdispatch "hl.dsp.window.resize({ window = \"$w\", x = $pw, y = $ph })" resizewindowpixel "exact $pw $ph,$w"
   hdispatch "hl.dsp.window.move({ window = \"$w\", x = $x, y = $y })" movewindowpixel "exact $x $y,$w"
   hdispatch "hl.dsp.window.pin({ window = \"$w\", action = \"on\" })" pin "$w"
 }
@@ -206,8 +223,11 @@ play() {
     "$target" >/dev/null 2>&1 &
   local i addr=""
   for i in $(seq 1 40); do
-    addr="$(find_window "cornertube")"
-    [ -z "$addr" ] && addr="$(find_window "mpv")"
+    # Match mpv by class first: the chooser window (class
+    # com.jjuanent.cornertube-input, title CornerTube) also matches
+    # "cornertube" and is still closing when play starts.
+    addr="$(find_window "mpv")"
+    [ -z "$addr" ] && addr="$(find_window "cornertube")"
     [ -n "$addr" ] && break
     sleep 0.5
   done
