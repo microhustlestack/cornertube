@@ -245,8 +245,10 @@ play() {
       "$target" >>"$HOME/.cache/cornertube/mpv.log" 2>&1 &
     addr=""
     for i in $(seq 1 40); do
-      addr="$(find_window "cornertube")"
-      [ -z "$addr" ] && addr="$(find_window "mpv")"
+      # Match the mpv window by class first: the chooser window that just
+      # launched us also matches "cornertube" while it is closing.
+      addr="$(find_window "mpv")"
+      [ -z "$addr" ] && addr="$(find_window "cornertube")"
       [ -n "$addr" ] && break
       if [ "$i" -gt 6 ] && ! pgrep -x mpv >/dev/null; then break; fi
       sleep 0.5
