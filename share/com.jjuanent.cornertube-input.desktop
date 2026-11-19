@@ -2,9 +2,9 @@
 Type=Application
 Name=Play a Video (PiP)
 Comment=Type a search or paste a link - plays video-only in the PiP corner
-Exec=tizentube-pip-input
-Icon=tizentube-pip
+Exec=cornertube-input
+Icon=cornertube
 Terminal=false
 Categories=AudioVideo;Video;Player;
 Keywords=youtube;pip;search;play;
-StartupWMClass=com.jjuanent.tizentube-pip-input
+StartupWMClass=com.jjuanent.cornertube-input

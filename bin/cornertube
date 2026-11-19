@@ -1,16 +1,16 @@
 #!/usr/bin/env bash
-# TizenTube PiP - YouTube TV as a pinned picture-in-picture app on Omarchy/Hyprland.
+# CornerTube - YouTube TV as a pinned picture-in-picture app on Omarchy/Hyprland.
 #
 # Modes:
-#   tizentube-pip                 Open the YouTube TV interface (the same
+#   cornertube                 Open the YouTube TV interface (the same
 #                                 https://www.youtube.com/tv base the TizenTube
 #                                 Cobalt app uses on the Samsung TV) in a small
 #                                 floating, pinned (all workspaces, on top) window.
-#   tizentube-pip play <url>      Play one video in a pinned PiP mpv window.
-#   tizentube-pip play <words>    Search YouTube and play the first result (mpv).
-#   tizentube-pip tv              Launch TizenTube on the studio Samsung TV
+#   cornertube play <url>      Play one video in a pinned PiP mpv window.
+#   cornertube play <words>    Search YouTube and play the first result (mpv).
+#   cornertube tv              Launch TizenTube on the studio Samsung TV
 #                                 (192.168.50.61) via the Tizen SDK docker image.
-#   tizentube-pip stop            Close the PiP browser / mpv PiP windows.
+#   cornertube stop            Close the PiP browser / mpv PiP windows.
 #
 # Env overrides: TIZENTUBE_PIP_WIDTH (960), TIZENTUBE_PIP_HEIGHT (540),
 # TIZENTUBE_PIP_POSITION (bottom-right | top-right), TIZENTUBE_TV_IP.
@@ -21,7 +21,7 @@ HEIGHT="${TIZENTUBE_PIP_HEIGHT:-540}"
 POSITION="${TIZENTUBE_PIP_POSITION:-bottom-right}"
 TV_IP="${TIZENTUBE_TV_IP:-192.168.50.61}"
 TV_APP_ID="xvvl3S1TT1.TizenTubeStandalone"
-PROFILE="$HOME/.local/share/tizentube-pip/profile"
+PROFILE="$HOME/.local/share/cornertube/profile"
 APP_CLASS="TizenTubePiP"
 TV_URL="https://www.youtube.com/tv"
 
@@ -62,7 +62,7 @@ pick_browser() {
   for b in brave chromium google-chrome-stable google-chrome; do
     if command -v "$b" >/dev/null 2>&1; then echo "$b"; return 0; fi
   done
-  echo "tizentube-pip: no Chromium-based browser found" >&2; return 1
+  echo "cornertube: no Chromium-based browser found" >&2; return 1
 }
 
 # Echo the address of the newest Hyprland client whose class/title matches $1.
@@ -139,7 +139,7 @@ open_app() {
   browser="$(pick_browser)"
   # One profile per browser: Chromium and Brave profiles are not interchangeable,
   # and each keeps its own YouTube sign-in.
-  PROFILE="$HOME/.local/share/tizentube-pip/profile-$(basename "$browser")"
+  PROFILE="$HOME/.local/share/cornertube/profile-$(basename "$browser")"
   mkdir -p "$PROFILE"
   # If it is already open, re-apply the PiP treatment and focus it.
   local existing
@@ -147,7 +147,7 @@ open_app() {
   if [ -n "$existing" ]; then
     apply_pip "$existing"
     hdispatch "hl.dsp.focus({ window = \"address:$existing\" })" focuswindow "address:$existing"
-    echo "TizenTube PiP already open, PiP re-applied: $existing"
+    echo "CornerTube already open, PiP re-applied: $existing"
     return 0
   fi
   nohup "$browser" \
@@ -166,33 +166,33 @@ open_app() {
   done
   if [ -n "$addr" ]; then
     apply_pip "$addr"
-    echo "TizenTube PiP open: $addr (${WIDTH}x${HEIGHT}, $POSITION, pinned)"
+    echo "CornerTube open: $addr (${WIDTH}x${HEIGHT}, $POSITION, pinned)"
   else
-    echo "tizentube-pip: browser launched but its window was not found in hyprctl clients" >&2
+    echo "cornertube: browser launched but its window was not found in hyprctl clients" >&2
     return 1
   fi
 }
 
 play() {
   setup_hypr_env
-  [ $# -ge 1 ] || { echo "usage: tizentube-pip play <url|search words>" >&2; return 2; }
+  [ $# -ge 1 ] || { echo "usage: cornertube play <url|search words>" >&2; return 2; }
   local target="$*"
   case "$target" in
     http://*|https://*) ;;
     *)
       # mpv's yt-dlp hook cannot open ytsearch: pseudo-URLs, so resolve the
       # search to a real watch URL first.
-      command -v yt-dlp >/dev/null 2>&1 || { echo "tizentube-pip: yt-dlp not installed (needed for search)" >&2; return 1; }
+      command -v yt-dlp >/dev/null 2>&1 || { echo "cornertube: yt-dlp not installed (needed for search)" >&2; return 1; }
       local resolved
       resolved="$(yt-dlp --no-playlist --print webpage_url "ytsearch1:$target" 2>/dev/null | head -1)"
-      [ -n "$resolved" ] || { echo "tizentube-pip: no YouTube result for: $target" >&2; return 1; }
+      [ -n "$resolved" ] || { echo "cornertube: no YouTube result for: $target" >&2; return 1; }
       echo "Search result: $resolved"
       target="$resolved"
       ;;
   esac
-  command -v mpv >/dev/null 2>&1 || { echo "tizentube-pip: mpv not installed" >&2; return 1; }
+  command -v mpv >/dev/null 2>&1 || { echo "cornertube: mpv not installed" >&2; return 1; }
   setsid nohup mpv \
-    --title="TizenTube PiP" \
+    --title="CornerTube" \
     --no-border \
     --osc=no \
     --osd-level=0 \
@@ -206,7 +206,7 @@ play() {
     "$target" >/dev/null 2>&1 &
   local i addr=""
   for i in $(seq 1 40); do
-    addr="$(find_window "tizentube pip")"
+    addr="$(find_window "cornertube")"
     [ -z "$addr" ] && addr="$(find_window "mpv")"
     [ -n "$addr" ] && break
     sleep 0.5
@@ -215,7 +215,7 @@ play() {
     apply_pip "$addr"
     echo "Playing in PiP: $addr"
   else
-    echo "tizentube-pip: mpv launched but its window was not found" >&2
+    echo "cornertube: mpv launched but its window was not found" >&2
     return 1
   fi
 }
@@ -234,7 +234,7 @@ stop_pip() {
     hdispatch "hl.dsp.window.close({ window = \"address:$addr\" })" closewindow "address:$addr"
     echo "Closed PiP window: $addr"
   fi
-  addr="$(find_window "tizentube pip")"
+  addr="$(find_window "cornertube")"
     [ -z "$addr" ] && addr="$(find_window "mpv")"
   if [ -n "$addr" ]; then
     hdispatch "hl.dsp.window.close({ window = \"address:$addr\" })" closewindow "address:$addr"
@@ -247,5 +247,5 @@ case "${1:-app}" in
   play)  shift; play "$@" ;;
   tv)    launch_tv ;;
   stop)  stop_pip ;;
-  *)     echo "usage: tizentube-pip [app|play <url|words>|tv|stop]" >&2; exit 2 ;;
+  *)     echo "usage: cornertube [app|play <url|words>|tv|stop]" >&2; exit 2 ;;
 esac

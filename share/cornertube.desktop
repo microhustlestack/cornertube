@@ -1,9 +1,9 @@
 [Desktop Entry]
 Type=Application
-Name=TizenTube PiP
+Name=CornerTube
 Comment=YouTube TV in a pinned picture-in-picture window (Omarchy/Hyprland)
-Exec=tizentube-pip app
-Icon=tizentube-pip
+Exec=cornertube app
+Icon=cornertube
 Terminal=false
 Categories=AudioVideo;Video;Player;
 Keywords=youtube;pip;picture-in-picture;tizentube;

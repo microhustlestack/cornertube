@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""TizenTube PiP input box v3.
+"""CornerTube input box v3.
 Type a YouTube search: shows the top results NEWEST FIRST, each with a
 thumbnail, title, channel, runtime and posted date. Click one and it
 plays video-only in the pinned PiP corner window. Paste a link instead
@@ -10,8 +10,8 @@ gi.require_version("Gtk", "4.0")
 gi.require_version("GdkPixbuf", "2.0")
 from gi.repository import Gtk, Gio, GLib, GdkPixbuf
 
-CACHE = os.path.expanduser("~/.cache/tizentube-pip/thumbs")
-PIP = os.path.expanduser("~/.local/bin/tizentube-pip")
+CACHE = os.path.expanduser("~/.cache/cornertube/thumbs")
+PIP = os.path.expanduser("~/.local/bin/cornertube")
 N = 5
 
 def fmt_dur(s):
@@ -41,7 +41,7 @@ def fmt_date(e):
 
 class App(Gtk.Application):
     def __init__(self):
-        super().__init__(application_id="com.jjuanent.tizentube-pip-input",
+        super().__init__(application_id="com.jjuanent.cornertube-input",
                          flags=Gio.ApplicationFlags.FLAGS_NONE)
 
     def do_activate(self):

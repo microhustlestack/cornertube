@@ -2,11 +2,11 @@ import QtQuick
 import qs.Ui
 import qs.Commons
 
-// TizenTube PiP: a play icon in the bar. Left click opens the Play a Video
+// CornerTube: a play icon in the bar. Left click opens the Play a Video
 // input box (search or paste a link -> video-only PiP in the corner).
 BarWidget {
   id: root
-  moduleName: "wstunltd-sith002.tizentube-pip"
+  moduleName: "wstunltd-sith002.cornertube"
 
   implicitWidth: button.implicitWidth
   implicitHeight: button.implicitHeight
@@ -26,7 +26,7 @@ BarWidget {
     }
     onPressed: function(b) {
       if (b === Qt.LeftButton) {
-        root.bar.run("/home/wstunltd-sith002/.local/bin/tizentube-pip-input")
+        root.bar.run("/home/wstunltd-sith002/.local/bin/cornertube-input")
       }
     }
   }

@@ -1,4 +1,4 @@
-# TizenTube PiP for Omarchy Linux
+# CornerTube for Omarchy Linux
 
 YouTube TV as a true picture-in-picture app on an Omarchy (Hyprland) desktop:
 a small video window that **floats, pins to every workspace, stays on top, and
@@ -20,13 +20,13 @@ Two honest differences from the TV app:
 
 - **Browsing mode is the regular YouTube TV UI.** Ads behave like normal
   YouTube in a browser; there is no TV-style proxy in front of it.
-- **Play mode is ad-free.** `tizentube-pip play <url|search>` streams the
+- **Play mode is ad-free.** `cornertube play <url|search>` streams the
   video directly with mpv + yt-dlp — no browser, no ads, just the video in
   the pinned PiP window.
 
 ## The Play a Video chooser
 
-`Play a Video (PiP)` (script `tizentube-pip-input`, a small GTK4 window) is
+`Play a Video (PiP)` (script `cornertube-input`, a small GTK4 window) is
 the front door. Type a YouTube search and it shows the top 5 results
 **newest first**, each with a **thumbnail, title, channel, runtime and the
 date it was posted** - click one and it plays video-only in the PiP corner.
@@ -52,39 +52,39 @@ Super+Alt+P next corner, Super+Alt+O cycle size.
 
 That installs, for the current user only (no sudo):
 
-- `~/.local/bin/tizentube-pip` — the launcher script
-- `~/.local/share/applications/tizentube-pip.desktop` — "TizenTube PiP" in the Omarchy launcher
-- `~/.local/share/applications/tizentube-on-tv.desktop` — "TizenTube on TV" (see below)
+- `~/.local/bin/cornertube` — the launcher script
+- `~/.local/share/applications/cornertube.desktop` — "CornerTube" in the Omarchy launcher
+- `~/.local/share/applications/cornertube-on-tv.desktop` — "TizenTube on TV" (see below)
 - A managed window-rule block appended to `~/.config/hypr/looknfeel.lua`
-  (backup saved as `looknfeel.lua.bak.tizentube-pip`), then reloads Hyprland
+  (backup saved as `looknfeel.lua.bak.cornertube`), then reloads Hyprland
 
 Requirements (all standard on Omarchy): a Chromium-based browser,
 `hyprctl`, `python3`. Play mode also needs `mpv` and `yt-dlp`. The chooser also needs `python3` with GTK4 (PyGObject), standard on Omarchy.
 
 The browser is **Brave** by Juan's choice (2026-11-18); set
 `TIZENTUBE_PIP_BROWSER=chromium` (or chrome) to use another one. Each
-browser gets its own profile (`~/.local/share/tizentube-pip/profile-brave`,
+browser gets its own profile (`~/.local/share/cornertube/profile-brave`,
 `profile-chromium`, ...), so the YouTube sign-in is per browser — switching
 browsers means signing in once in the new one.
 
 ## Use
 
-- **Launcher:** open "TizenTube PiP" from the Omarchy app launcher.
-- **Terminal:** `tizentube-pip`
+- **Launcher:** open "CornerTube" from the Omarchy app launcher.
+- **Terminal:** `cornertube`
 - **First launch only:** sign in to YouTube in that window. The dedicated
-  per-browser profile lives in `~/.local/share/tizentube-pip/profile-*`, so
+  per-browser profile lives in `~/.local/share/cornertube/profile-*`, so
   the sign-in persists and never mixes with your normal browser profile.
-- **Play one video:** `tizentube-pip play https://www.youtube.com/watch?v=...`
-  or `tizentube-pip play omarchy linux tutorial` (plays the first search hit)
-- **Close the PiP windows:** `tizentube-pip stop`
+- **Play one video:** `cornertube play https://www.youtube.com/watch?v=...`
+  or `cornertube play omarchy linux tutorial` (plays the first search hit)
+- **Close the PiP windows:** `cornertube stop`
 - **Size / corner:** `TIZENTUBE_PIP_WIDTH`, `TIZENTUBE_PIP_HEIGHT`,
   `TIZENTUBE_PIP_POSITION=top-right|bottom-right` (defaults 960x540, bottom-right)
 
 How the PiP is enforced, twice over:
 
-1. Hyprland window rules (in `hypr/tizentube-pip.lua`) match the YouTube TV
+1. Hyprland window rules (in `hypr/cornertube.lua`) match the YouTube TV
    app window's url-derived class `chrome-www.youtube.com__tv-Default`
-   (and mpv windows titled "TizenTube PiP"): float, pin, 960x540, keep
+   (and mpv windows titled "CornerTube"): float, pin, 960x540, keep
    aspect ratio, move to the bottom-right corner.
 2. The launcher script also finds the new window in `hyprctl clients` and
    applies float / pin / resize / move directly — using this Hyprland's Lua
@@ -94,7 +94,7 @@ How the PiP is enforced, twice over:
 
 ## TizenTube on TV
 
-`tizentube-pip tv` (or the "TizenTube on TV" launcher) runs the Tizen SDK
+`cornertube tv` (or the "TizenTube on TV" launcher) runs the Tizen SDK
 command that launches TizenTube on the studio TV:
 
 ```bash
@@ -118,7 +118,7 @@ on with the TV pointing at this machine's IP. Override the TV address with
 
 ## Files
 
-- `bin/tizentube-pip` — launcher / play / tv / stop script
+- `bin/cornertube` — launcher / play / tv / stop script
 - `share/*.desktop` — Omarchy launcher entries
-- `hypr/tizentube-pip.lua` — the Hyprland window-rule block
+- `hypr/cornertube.lua` — the Hyprland window-rule block
 - `install.sh`, `uninstall.sh`

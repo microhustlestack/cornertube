@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
-  "id": "wstunltd-sith002.tizentube-pip",
-  "name": "TizenTube PiP",
+  "id": "wstunltd-sith002.cornertube",
+  "name": "CornerTube",
   "version": "1.0.0",
   "author": "wstunltd-sith002",
   "license": "MIT",
@@ -9,7 +9,7 @@
   "kinds": ["bar-widget"],
   "entryPoints": { "barWidget": "BarWidget.qml" },
   "barWidget": {
-    "displayName": "TizenTube PiP",
+    "displayName": "CornerTube",
     "description": "Open the Play a Video (PiP) input box.",
     "category": "Apps",
     "allowMultiple": false,
