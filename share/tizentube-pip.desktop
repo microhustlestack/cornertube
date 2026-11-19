@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=TizenTube PiP
+Comment=YouTube TV in a pinned picture-in-picture window (Omarchy/Hyprland)
+Exec=tizentube-pip app
+Icon=tizentube-pip
+Terminal=false
+Categories=AudioVideo;Video;Player;
+Keywords=youtube;pip;picture-in-picture;tizentube;
+StartupWMClass=brave-www.youtube.com__tv-Default

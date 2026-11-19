@@ -1,0 +1,170 @@
+#!/usr/bin/env python3
+"""TizenTube PiP input box v3.
+Type a YouTube search: shows the top results NEWEST FIRST, each with a
+thumbnail, title, channel, runtime and posted date. Click one and it
+plays video-only in the pinned PiP corner window. Paste a link instead
+and it plays that video directly."""
+import datetime, json, os, subprocess, sys, threading, urllib.request
+import gi
+gi.require_version("Gtk", "4.0")
+gi.require_version("GdkPixbuf", "2.0")
+from gi.repository import Gtk, Gio, GLib, GdkPixbuf
+
+CACHE = os.path.expanduser("~/.cache/tizentube-pip/thumbs")
+PIP = os.path.expanduser("~/.local/bin/tizentube-pip")
+N = 5
+
+def fmt_dur(s):
+    try:
+        s = int(s)
+    except Exception:
+        return ""
+    h, m, sec = s // 3600, (s % 3600) // 60, s % 60
+    return (f"{h}:{m:02d}:{sec:02d}" if h else f"{m}:{sec:02d}")
+
+def posted_ts(e):
+    if e.get("timestamp"):
+        return e["timestamp"]
+    ud = e.get("upload_date") or ""
+    try:
+        return datetime.datetime.strptime(ud, "%Y%m%d").timestamp()
+    except Exception:
+        return 0
+
+def fmt_date(e):
+    ud = e.get("upload_date") or ""
+    try:
+        return datetime.datetime.strptime(ud, "%Y%m%d").strftime("%b %d, %Y")
+    except Exception:
+        ts = posted_ts(e)
+        return datetime.datetime.fromtimestamp(ts).strftime("%b %d, %Y") if ts else ""
+
+class App(Gtk.Application):
+    def __init__(self):
+        super().__init__(application_id="com.jjuanent.tizentube-pip-input",
+                         flags=Gio.ApplicationFlags.FLAGS_NONE)
+
+    def do_activate(self):
+        self.win = Gtk.ApplicationWindow(application=self, title="Play a Video - PiP")
+        self.win.set_default_size(720, 560)
+        self.stack = Gtk.Stack()
+        self.stack.set_transition_type(Gtk.StackTransitionType.CROSSFADE)
+        self.win.set_child(self.stack)
+        ebox = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
+        ebox.set_valign(Gtk.Align.CENTER)
+        for m in ("margin_top", "margin_bottom", "margin_start", "margin_end"):
+            ebox.set_property(m, 18)
+        label = Gtk.Label(label="Search YouTube or paste a video link:")
+        label.set_halign(Gtk.Align.START)
+        self.entry = Gtk.Entry()
+        self.entry.set_placeholder_text("e.g. Omarchy Linux  -  or a youtube.com link")
+        btn = Gtk.Button(label="Search / Play in PiP")
+        btn.add_css_class("suggested-action")
+        self.entry.connect("activate", self.on_submit)
+        btn.connect("clicked", self.on_submit)
+        ebox.append(label); ebox.append(self.entry); ebox.append(btn)
+        self.stack.add_named(ebox, "entry")
+        rbox = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
+        for m in ("margin_top", "margin_bottom", "margin_start", "margin_end"):
+            rbox.set_property(m, 12)
+        top = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
+        back = Gtk.Button(label="< New search")
+        back.connect("clicked", lambda *_: self.stack.set_visible_child_name("entry"))
+        self.status = Gtk.Label(label="")
+        self.status.set_halign(Gtk.Align.START)
+        top.append(back); top.append(self.status)
+        self.listbox = Gtk.ListBox()
+        self.listbox.set_selection_mode(Gtk.SelectionMode.NONE)
+        self.listbox.connect("row-activated", self.on_row)
+        scroll = Gtk.ScrolledWindow()
+        scroll.set_vexpand(True)
+        scroll.set_child(self.listbox)
+        rbox.append(top); rbox.append(scroll)
+        self.stack.add_named(rbox, "results")
+        self.win.present()
+        self.entry.grab_focus()
+
+    def on_submit(self, *_):
+        text = self.entry.get_text().strip()
+        if not text:
+            return
+        if text.startswith("http://") or text.startswith("https://"):
+            self.play(text)
+            return
+        self.status.set_text(f"Searching YouTube for \"{text}\" (newest first)...")
+        while (row := self.listbox.get_row_at_index(0)) is not None:
+            self.listbox.remove(row)
+        self.stack.set_visible_child_name("results")
+        threading.Thread(target=self.search, args=(text,), daemon=True).start()
+
+    def search(self, query):
+        entries = []
+        try:
+            out = subprocess.run(
+                ["yt-dlp", "-J", "--no-playlist", f"ytsearch{N}:{query}"],
+                capture_output=True, text=True, timeout=120)
+            entries = json.loads(out.stdout).get("entries", [])
+        except Exception as e:
+            GLib.idle_add(self.status.set_text, f"Search failed: {e}")
+        entries = [e for e in entries if e and e.get("id")]
+        entries.sort(key=posted_ts, reverse=True)
+        os.makedirs(CACHE, exist_ok=True)
+        for e in entries:
+            thumbs = e.get("thumbnails") or []
+            url = thumbs[-1]["url"] if thumbs else f"https://i.ytimg.com/vi/{e['id']}/mqdefault.jpg"
+            path = os.path.join(CACHE, e["id"] + ".jpg")
+            if not os.path.exists(path):
+                try:
+                    req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+                    with urllib.request.urlopen(req, timeout=15) as r, open(path, "wb") as f:
+                        f.write(r.read())
+                except Exception:
+                    pass
+        GLib.idle_add(self.show_results, entries)
+
+    def show_results(self, entries):
+        if not entries:
+            self.status.set_text("No results found. Try different words.")
+            return
+        self.status.set_text("Pick a video (newest first):")
+        for e in entries:
+            row = Gtk.ListBoxRow()
+            row.video_id = e.get("id", "")
+            h = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=12)
+            for m in ("margin_top", "margin_bottom", "margin_start", "margin_end"):
+                h.set_property(m, 6)
+            path = os.path.join(CACHE, (e.get("id") or "") + ".jpg")
+            pic = Gtk.Picture()
+            pic.set_size_request(160, 90)
+            if os.path.exists(path):
+                try:
+                    pic.set_pixbuf(GdkPixbuf.Pixbuf.new_from_file_at_scale(path, 160, 90, True))
+                except Exception:
+                    pass
+            v = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4)
+            v.set_valign(Gtk.Align.CENTER)
+            title = Gtk.Label(label=e.get("title", "(untitled)"))
+            title.set_halign(Gtk.Align.START)
+            title.set_wrap(True)
+            title.set_lines(2)
+            title.add_css_class("title-4")
+            parts = [e.get("channel") or e.get("uploader") or "", fmt_dur(e.get("duration")), fmt_date(e)]
+            sub = Gtk.Label(label="  -  ".join(x for x in parts if x))
+            sub.set_halign(Gtk.Align.START)
+            sub.add_css_class("dim-label")
+            v.append(title); v.append(sub)
+            h.append(pic); h.append(v)
+            row.set_child(h)
+            self.listbox.append(row)
+
+    def on_row(self, _box, row):
+        if row is not None and getattr(row, "video_id", ""):
+            self.play(f"https://www.youtube.com/watch?v={row.video_id}")
+
+    def play(self, url):
+        subprocess.Popen([PIP, "play", url], stdout=subprocess.DEVNULL,
+                         stderr=subprocess.DEVNULL, start_new_session=True)
+        self.win.close()
+
+if __name__ == "__main__":
+    sys.exit(App().run(sys.argv))

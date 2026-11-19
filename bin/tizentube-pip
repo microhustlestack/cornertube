@@ -1,0 +1,251 @@
+#!/usr/bin/env bash
+# TizenTube PiP - YouTube TV as a pinned picture-in-picture app on Omarchy/Hyprland.
+#
+# Modes:
+#   tizentube-pip                 Open the YouTube TV interface (the same
+#                                 https://www.youtube.com/tv base the TizenTube
+#                                 Cobalt app uses on the Samsung TV) in a small
+#                                 floating, pinned (all workspaces, on top) window.
+#   tizentube-pip play <url>      Play one video in a pinned PiP mpv window.
+#   tizentube-pip play <words>    Search YouTube and play the first result (mpv).
+#   tizentube-pip tv              Launch TizenTube on the studio Samsung TV
+#                                 (192.168.50.61) via the Tizen SDK docker image.
+#   tizentube-pip stop            Close the PiP browser / mpv PiP windows.
+#
+# Env overrides: TIZENTUBE_PIP_WIDTH (960), TIZENTUBE_PIP_HEIGHT (540),
+# TIZENTUBE_PIP_POSITION (bottom-right | top-right), TIZENTUBE_TV_IP.
+set -euo pipefail
+
+WIDTH="${TIZENTUBE_PIP_WIDTH:-960}"
+HEIGHT="${TIZENTUBE_PIP_HEIGHT:-540}"
+POSITION="${TIZENTUBE_PIP_POSITION:-bottom-right}"
+TV_IP="${TIZENTUBE_TV_IP:-192.168.50.61}"
+TV_APP_ID="xvvl3S1TT1.TizenTubeStandalone"
+PROFILE="$HOME/.local/share/tizentube-pip/profile"
+APP_CLASS="TizenTubePiP"
+TV_URL="https://www.youtube.com/tv"
+
+# --- Hyprland session env -------------------------------------------------
+# When launched from the desktop this is already set. When run from a shell
+# without the graphical session (ssh, a gadget session), discover it.
+setup_hypr_env() {
+  export XDG_RUNTIME_DIR="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}"
+  export WAYLAND_DISPLAY="${WAYLAND_DISPLAY:-wayland-1}"
+  export DISPLAY="${DISPLAY:-:0}"
+  export DBUS_SESSION_BUS_ADDRESS="${DBUS_SESSION_BUS_ADDRESS:-unix:path=$XDG_RUNTIME_DIR/bus}"
+  if [ -z "${HYPRLAND_INSTANCE_SIGNATURE:-}" ]; then
+    local sig=""
+    sig="$(python3 - <<'PY' 2>/dev/null || true
+import glob
+for comm in glob.glob('/proc/[0-9]*/comm'):
+    try:
+        if open(comm).read().strip() in ('Hyprland', 'quickshell'):
+            pid = comm.split('/')[2]
+            for entry in open(f'/proc/{pid}/environ', 'rb').read().split(b'\0'):
+                if entry.startswith(b'HYPRLAND_INSTANCE_SIGNATURE='):
+                    print(entry.decode().split('=', 1)[1]); raise SystemExit
+    except SystemExit:
+        raise
+    except Exception:
+        pass
+PY
+)"
+    [ -n "$sig" ] && export HYPRLAND_INSTANCE_SIGNATURE="$sig"
+  fi
+}
+
+pick_browser() {
+  # Juan's pick (2026-11-18): Brave. Override with TIZENTUBE_PIP_BROWSER.
+  if [ -n "${TIZENTUBE_PIP_BROWSER:-}" ] && command -v "$TIZENTUBE_PIP_BROWSER" >/dev/null 2>&1; then
+    echo "$TIZENTUBE_PIP_BROWSER"; return 0
+  fi
+  for b in brave chromium google-chrome-stable google-chrome; do
+    if command -v "$b" >/dev/null 2>&1; then echo "$b"; return 0; fi
+  done
+  echo "tizentube-pip: no Chromium-based browser found" >&2; return 1
+}
+
+# Echo the address of the newest Hyprland client whose class/title matches $1.
+find_window() {
+  hyprctl clients -j 2>/dev/null | python3 -c "
+import json, sys
+pat = sys.argv[1].lower()
+try:
+    clients = json.load(sys.stdin)
+except Exception:
+    sys.exit(0)
+hits = [c for c in clients
+        if pat in (c.get('class', '') + ' ' + c.get('title', '')).lower()
+        or c.get('initialClass', '').lower() == pat]
+if hits:
+    print(hits[-1].get('address', ''))
+" "$1"
+}
+
+# The YouTube TV app window: Chromium --app gives it this url-derived class
+# (Omarchy web-app convention), regardless of --class on the browser itself.
+find_app_window() {
+  local addr
+  addr="$(find_window "youtube.com__tv")"
+  [ -z "$addr" ] && addr="$(find_window "$APP_CLASS")"
+  echo "$addr"
+}
+
+# This Hyprland (Lua config era) takes dispatchers as Lua expressions via
+# hyprctl dispatch; the old keyword form fails. Same pattern Omarchy's own
+# omarchy-hyprland-window-pop uses, with the keyword form as fallback.
+hdispatch() {
+  local lua="$1"; shift
+  hyprctl dispatch "$lua" >/dev/null 2>&1 || hyprctl dispatch "$@" >/dev/null 2>&1 || true
+}
+
+monitor_size() {
+  hyprctl monitors -j 2>/dev/null | python3 -c "
+import json, sys
+try:
+    mons = json.load(sys.stdin)
+except Exception:
+    print('3840 2160'); sys.exit(0)
+m = next((m for m in mons if m.get('focused')), mons[0] if mons else {})
+print(m.get('width', 3840), m.get('height', 2160))
+" 2>/dev/null || echo "3840 2160"
+}
+
+# Float, pin, size and place the window at $1 (address) as a PiP overlay.
+apply_pip() {
+  local addr="$1" mw mh x y
+  read -r mw mh <<<"$(monitor_size)"
+  x=$(( mw - WIDTH - 40 ))
+  if [ "$POSITION" = "top-right" ]; then y=83; else y=$(( mh - HEIGHT - 40 )); fi
+  # Each dispatcher is best-effort: window rules may already have done it.
+  local w="address:$addr"
+  hdispatch "hl.dsp.window.float({ window = \"$w\", action = \"on\" })" setfloating "$w"
+  hdispatch "hl.dsp.window.resize({ window = \"$w\", x = $WIDTH, y = $HEIGHT })" resizewindowpixel "exact $WIDTH $HEIGHT,$w"
+  hdispatch "hl.dsp.window.move({ window = \"$w\", x = $x, y = $y })" movewindowpixel "exact $x $y,$w"
+  # pin is a toggle without an action; action = "on" sets it idempotently.
+  hdispatch "hl.dsp.window.pin({ window = \"$w\", action = \"on\" })" pin "$w"
+  hdispatch "hl.dsp.window.alter_zorder({ window = \"$w\", mode = \"top\" })" alterzorder "top,$w"
+  # Second pass: some apps (mpv especially) reposition themselves once the
+  # stream/video size is known, after the first pass has already run.
+  sleep 1
+  hdispatch "hl.dsp.window.resize({ window = \"$w\", x = $WIDTH, y = $HEIGHT })" resizewindowpixel "exact $WIDTH $HEIGHT,$w"
+  hdispatch "hl.dsp.window.move({ window = \"$w\", x = $x, y = $y })" movewindowpixel "exact $x $y,$w"
+  hdispatch "hl.dsp.window.pin({ window = \"$w\", action = \"on\" })" pin "$w"
+}
+
+open_app() {
+  setup_hypr_env
+  local url="${1:-$TV_URL}" browser
+  browser="$(pick_browser)"
+  # One profile per browser: Chromium and Brave profiles are not interchangeable,
+  # and each keeps its own YouTube sign-in.
+  PROFILE="$HOME/.local/share/tizentube-pip/profile-$(basename "$browser")"
+  mkdir -p "$PROFILE"
+  # If it is already open, re-apply the PiP treatment and focus it.
+  local existing
+  existing="$(find_app_window)"
+  if [ -n "$existing" ]; then
+    apply_pip "$existing"
+    hdispatch "hl.dsp.focus({ window = \"address:$existing\" })" focuswindow "address:$existing"
+    echo "TizenTube PiP already open, PiP re-applied: $existing"
+    return 0
+  fi
+  nohup "$browser" \
+    --user-data-dir="$PROFILE" \
+    --app="$url" \
+    --window-size="$WIDTH,$HEIGHT" \
+    --no-first-run \
+    --disable-session-crashed-bubble \
+    >/dev/null 2>&1 &
+  # Wait for the window, then force the PiP treatment.
+  local i addr=""
+  for i in $(seq 1 40); do
+    addr="$(find_app_window)"
+    [ -n "$addr" ] && break
+    sleep 0.5
+  done
+  if [ -n "$addr" ]; then
+    apply_pip "$addr"
+    echo "TizenTube PiP open: $addr (${WIDTH}x${HEIGHT}, $POSITION, pinned)"
+  else
+    echo "tizentube-pip: browser launched but its window was not found in hyprctl clients" >&2
+    return 1
+  fi
+}
+
+play() {
+  setup_hypr_env
+  [ $# -ge 1 ] || { echo "usage: tizentube-pip play <url|search words>" >&2; return 2; }
+  local target="$*"
+  case "$target" in
+    http://*|https://*) ;;
+    *)
+      # mpv's yt-dlp hook cannot open ytsearch: pseudo-URLs, so resolve the
+      # search to a real watch URL first.
+      command -v yt-dlp >/dev/null 2>&1 || { echo "tizentube-pip: yt-dlp not installed (needed for search)" >&2; return 1; }
+      local resolved
+      resolved="$(yt-dlp --no-playlist --print webpage_url "ytsearch1:$target" 2>/dev/null | head -1)"
+      [ -n "$resolved" ] || { echo "tizentube-pip: no YouTube result for: $target" >&2; return 1; }
+      echo "Search result: $resolved"
+      target="$resolved"
+      ;;
+  esac
+  command -v mpv >/dev/null 2>&1 || { echo "tizentube-pip: mpv not installed" >&2; return 1; }
+  setsid nohup mpv \
+    --title="TizenTube PiP" \
+    --no-border \
+    --osc=no \
+    --osd-level=0 \
+    --cursor-autohide=always \
+    --hwdec=no \
+    --force-window=yes \
+    --ontop=yes \
+    --keepaspect=yes \
+    --geometry="${WIDTH}x${HEIGHT}-40-40" \
+    --ytdl-format="b[height<=720]/b[height<=1080]/b" \
+    "$target" >/dev/null 2>&1 &
+  local i addr=""
+  for i in $(seq 1 40); do
+    addr="$(find_window "tizentube pip")"
+    [ -z "$addr" ] && addr="$(find_window "mpv")"
+    [ -n "$addr" ] && break
+    sleep 0.5
+  done
+  if [ -n "$addr" ]; then
+    apply_pip "$addr"
+    echo "Playing in PiP: $addr"
+  else
+    echo "tizentube-pip: mpv launched but its window was not found" >&2
+    return 1
+  fi
+}
+
+launch_tv() {
+  echo "Launching TizenTube ($TV_APP_ID) on the TV at $TV_IP ..."
+  sudo docker run --rm --network host vitalets/tizen-webos-sdk bash -c \
+    "sdb connect $TV_IP && sdb -s $TV_IP:26101 shell 0 was_execute $TV_APP_ID"
+}
+
+stop_pip() {
+  setup_hypr_env
+  local addr
+  addr="$(find_app_window)"
+  if [ -n "$addr" ]; then
+    hdispatch "hl.dsp.window.close({ window = \"address:$addr\" })" closewindow "address:$addr"
+    echo "Closed PiP window: $addr"
+  fi
+  addr="$(find_window "tizentube pip")"
+    [ -z "$addr" ] && addr="$(find_window "mpv")"
+  if [ -n "$addr" ]; then
+    hdispatch "hl.dsp.window.close({ window = \"address:$addr\" })" closewindow "address:$addr"
+    echo "Closed PiP window: $addr"
+  fi
+}
+
+case "${1:-app}" in
+  app)   shift || true; open_app "${1:-}" ;;
+  play)  shift; play "$@" ;;
+  tv)    launch_tv ;;
+  stop)  stop_pip ;;
+  *)     echo "usage: tizentube-pip [app|play <url|words>|tv|stop]" >&2; exit 2 ;;
+esac

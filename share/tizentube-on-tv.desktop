@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=TizenTube on TV
+Comment=Launch TizenTube on the studio Samsung TV (192.168.50.61) via sdb
+Exec=tizentube-pip tv
+Icon=chromium
+Terminal=true
+Categories=AudioVideo;Video;
+Keywords=youtube;tizentube;samsung;tv;

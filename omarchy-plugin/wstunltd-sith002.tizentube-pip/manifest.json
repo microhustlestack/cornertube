@@ -1,0 +1,18 @@
+{
+  "schemaVersion": 1,
+  "id": "wstunltd-sith002.tizentube-pip",
+  "name": "TizenTube PiP",
+  "version": "1.0.0",
+  "author": "wstunltd-sith002",
+  "license": "MIT",
+  "description": "Play-a-Video icon in the bar. Click to open the PiP input box: search YouTube or paste a link, and the video plays video-only in the pinned corner window.",
+  "kinds": ["bar-widget"],
+  "entryPoints": { "barWidget": "BarWidget.qml" },
+  "barWidget": {
+    "displayName": "TizenTube PiP",
+    "description": "Open the Play a Video (PiP) input box.",
+    "category": "Apps",
+    "allowMultiple": false,
+    "defaultSection": "right"
+  }
+}
